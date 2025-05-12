@@ -1,0 +1,76 @@
+; 74HC165 - cpasjuste @ 2025
+
+; USRKEY: GP24
+
+.program hc165
+.side_set 1 opt
+
+.wrap_target
+    ; debug: wait for gpio 24 (button)
+    wait 0 gpio 24
+    wait 1 gpio 24
+
+    set pins, 0 ; latch low
+    set pins, 1 ; latch high
+    set x, 7    ; shift loop counter
+
+shift:
+    in pins, 1        side 0 ; read data and pulse the clock pin
+    jmp x--, shift    side 1 ; shift loop + clock pin
+
+    push
+.wrap
+
+% c-sdk {
+#include "hardware/gpio.h"
+
+typedef struct {
+    PIO pio;
+    uint sm;
+    uint offset;
+} hc165_t;
+
+void hc165_program_init(hc165_t *hc, uint data_pin, uint clk_pin, uint latch_pin, float clock_div) {
+
+    bool success = pio_claim_free_sm_and_add_program_for_gpio_range(
+        &hc165_program, &hc->pio, &hc->sm, &hc->offset, data_pin, 3, true);
+    if(!success) {
+        printf("ERR: hc165_program_init failed\n");
+        return;
+    }
+
+    printf("rhc165_program_init: pio: %x, sm: %i\n", hc->pio, hc->sm);
+    pio_sm_config c = hc165_program_get_default_config(hc->offset);
+
+    // testing
+    gpio_init(24);
+    gpio_set_dir(24, GPIO_IN);
+    gpio_pull_up(24);
+
+    for (int g = data_pin; g < data_pin + 3; g++) {
+        pio_gpio_init(hc->pio, g);
+    }
+
+    sm_config_set_in_pins(&c, data_pin);
+    sm_config_set_sideset_pins(&c, clk_pin);
+    sm_config_set_set_pins(&c, latch_pin, 1);
+    sm_config_set_in_shift(&c, false, false, 8);
+    sm_config_set_fifo_join(&c, PIO_FIFO_JOIN_RX);
+
+    // Set directions
+    pio_sm_set_consecutive_pindirs(hc->pio, hc->sm, data_pin, 1, false); // QH = input
+    pio_sm_set_consecutive_pindirs(hc->pio, hc->sm, clk_pin, 1, true);  // CLK = output
+    pio_sm_set_consecutive_pindirs(hc->pio, hc->sm, latch_pin, 1, true);  // /LD = output
+
+    // clock
+    sm_config_set_clkdiv(&c, clock_div);
+
+    pio_sm_init(hc->pio, hc->sm, hc->offset, &c);
+    pio_sm_set_enabled (hc->pio, hc->sm, true);
+}
+
+static inline uint8_t hc165_get(hc165_t *hc) {
+    return pio_sm_get_blocking(hc->pio, hc->sm);
+}
+
+%}
