@@ -19,6 +19,7 @@ target_link_libraries(${PROJECT_NAME} PUBLIC
 )
 
 pico_generate_pio_header(${PROJECT_NAME} ${CMAKE_CURRENT_SOURCE_DIR}/src/74hc165.pio)
+pico_generate_pio_header(${PROJECT_NAME} ${CMAKE_CURRENT_SOURCE_DIR}/src/74hc165-x2.pio)
 
 pico_enable_stdio_usb(${PROJECT_NAME} 0)
 pico_enable_stdio_uart(${PROJECT_NAME} 1)

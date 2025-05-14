@@ -2,7 +2,7 @@
 
 ; USRKEY: GP24
 
-.program hc165
+.program hc165x2
 .side_set 1 opt
 
 .wrap_target
@@ -12,7 +12,7 @@
 
     set pins, 0 ; latch low
     set pins, 1 ; latch high
-    set x, 7    ; shift loop counter
+    set x, 15   ; shift loop counter
 shift:
     in pins, 1        side 0 ; read data and pulse the clock pin
     jmp x--, shift    side 1 ; shift loop + clock pin
@@ -26,19 +26,19 @@ typedef struct {
     PIO pio;
     uint sm;
     uint offset;
-} hc165_t;
+} hc165x2_t;
 
-void hc165_program_init(hc165_t *hc, uint data_pin, uint clk_pin, uint latch_pin, float clock_div) {
+void hc165x2_program_init(hc165x2_t *hc, uint data_pin, uint clk_pin, uint latch_pin, float clock_div) {
 
     bool success = pio_claim_free_sm_and_add_program_for_gpio_range(
-        &hc165_program, &hc->pio, &hc->sm, &hc->offset, data_pin, 3, true);
+        &hc165x2_program, &hc->pio, &hc->sm, &hc->offset, data_pin, 3, true);
     if(!success) {
-        printf("ERR: hc165_program_init failed\n");
+        printf("ERR: hc165x2_program_init failed\n");
         return;
     }
 
-    printf("rhc165_program_init: pio: %x, sm: %i\n", hc->pio, hc->sm);
-    pio_sm_config c = hc165_program_get_default_config(hc->offset);
+    printf("hc165x2_program_init: pio: %x, sm: %i\n", hc->pio, hc->sm);
+    pio_sm_config c = hc165x2_program_get_default_config(hc->offset);
 
     // testing
     gpio_init(24);
@@ -52,7 +52,7 @@ void hc165_program_init(hc165_t *hc, uint data_pin, uint clk_pin, uint latch_pin
     sm_config_set_in_pins(&c, data_pin);
     sm_config_set_sideset_pins(&c, clk_pin);
     sm_config_set_set_pins(&c, latch_pin, 1);
-    sm_config_set_in_shift(&c, false, false, 8);
+    sm_config_set_in_shift(&c, false, false, 16);
     sm_config_set_fifo_join(&c, PIO_FIFO_JOIN_RX);
 
     // Set directions
@@ -67,7 +67,7 @@ void hc165_program_init(hc165_t *hc, uint data_pin, uint clk_pin, uint latch_pin
     pio_sm_set_enabled (hc->pio, hc->sm, true);
 }
 
-static inline uint8_t hc165_get(hc165_t *hc) {
+static inline uint16_t hc165x2_get(hc165x2_t *hc) {
     return pio_sm_get_blocking(hc->pio, hc->sm);
 }
 
